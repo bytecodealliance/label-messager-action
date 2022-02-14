@@ -1,12 +1,12 @@
-name: "Subscribe to Label"
-description: "Allows users to subscribe to a label and automatically get @'d when the label is added to a pull request or issue"
+name: "Label Messager"
+description: "Automatically leave a message when an issue or pull request has a certain label"
 inputs:
   repo-token:
     description: "GITHUB_TOKEN secret"
     required: true
-  configuration-path:
-    description: "The path for the user and label configurations"
-    default: ".github/subscribe-to-label.json"
+  message-directory:
+    description: "The directory path containing all of the messages"
+    default: ".github/label-messager"
   operations-per-run:
     description: "The rough number of github API calls to do per background run. This is to avoid running up against rate limits."
     default: 50

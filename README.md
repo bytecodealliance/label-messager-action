@@ -1,14 +1,13 @@
-# Subscribe to Label Action
+# Label Messager Action
 
-Allows users to subscribe to a label and automatically get @'d when the label is
-added to a pull request or issue.
-
+Leave a message on issues and comments when they are labeled with a specific
+label.
 ## Usage
 
-Add a `.github/workflows/subscribe-to-label.yml` file to your repository:
+Add a `.github/workflows/label-messager.yml` file to your repository:
 
 ```yaml
-name: "Subscribe to Label"
+name: "Label Messager"
 on:
   issues:
     types: ["labeled"]
@@ -22,21 +21,14 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     steps:
-    - uses: bytecodealliance/subscribe-to-label-action@v1
+    - uses: bytecodealliance/label-messager-action@v1
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
 ```
 
-Then, configure which users get @'d when for which labels in
-`.github/subscribe-to-label.json`:
-
-```json
-{
-    "example_user_1": ["bug", "help wanted"],
-    "example_user_2": ["good first issue"],
-    "example_user_3": ["enhancement"]
-}
-```
+Then configure what messages to add when issues or pull requests are labeled
+with which label by adding files in the `.github/label-messager` directory. The
+message for label `MY_LABEL` is the file `.github/label-messager/MY_LABEL`.
 
 ## Contributing
 

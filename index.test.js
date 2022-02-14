@@ -1,80 +1,48 @@
 /*global test*/
 const assert = require("assert");
 const {
-  getUsersToNotifyForLabel,
-  getCommentLabels,
+  getCommentLabel,
   makeMessage,
-} = require("./subscribe-to-label");
-
-test("test getUsersToNotifyForLabel", () => {
-  const config = {
-    fitzgen: ["fuzzing"],
-    bob: ["wasmtime", "fuzzing"],
-  };
-
-  const fuzzingUsers = getUsersToNotifyForLabel(config, "fuzzing");
-  assert.deepEqual(fuzzingUsers, ["fitzgen", "bob"]);
-
-  const wasmtimeUsers = getUsersToNotifyForLabel(config, "wasmtime");
-  assert.deepEqual(wasmtimeUsers, ["bob"]);
-
-  const zzzUsers = getUsersToNotifyForLabel(config, "zzz");
-  assert.deepEqual(zzzUsers, []);
-});
+} = require("./label-messager");
 
 test("test makeMessage", () => {
   const expected = `
-#### Subscribe to Label Action
+#### Label Messager: wasmtime:config
 
-cc @bnjbvr, @fitzgen
+This is a message for you
 
 <details>
-This issue or pull request has been labeled: "awesome", "cranelift", "fuzzing"
 
-Thus the following users have been cc'd because of the following labels:
+To modify this label's message, edit the <code>.github/label-messager/wasmtime:config</code> file.  To
+stop leaving these messages for the <code>wasmtime:config</code> label completely,
+remove that file.
 
-* bnjbvr: cranelift, fuzzing
-* fitzgen: fuzzing
+To add new label messages, add a file inside the <code>.github/label-messager</code>
+directory with the name of the label.
 
-To subscribe or unsubscribe from this label, edit the <code>.github/subscribe-to-label.json</code> configuration file.
+[Learn more.](https://github.com/bytecodealliance/label-messager-action)
 
-[Learn more.](https://github.com/bytecodealliance/subscribe-to-label-action)
 </details>
 `.trim();
 
-  let userToLabel = new Map();
-  userToLabel.set("bnjbvr", ["fuzzing", "cranelift"]);
-  userToLabel.set("fitzgen", ["fuzzing"]);
-
-  let labels = ["fuzzing", "awesome", "cranelift"];
-
-  let configPath = ".github/subscribe-to-label.json";
-
-  const observed = makeMessage(userToLabel, labels, configPath);
+  const observed = makeMessage(
+    ".github/label-messager",
+    ".github/label-messager/wasmtime:config",
+    "wasmtime:config",
+    "This is a message for you"
+  );
 
   assert.equal(expected, observed);
 });
 
-test("test getCommentLabels", () => {
-  let userToLabel = new Map();
-  userToLabel.set("fitzgen", ["fuzzing"]);
-  let providedLabels = ["fuzzing", "cranelift"];
-  let configPath = ".github/subscribe-to-label.json";
+test("test getCommentLabel", () => {
+  const comment = makeMessage(
+    ".github/label-messager",
+    ".github/label-messager/wasmtime:config",
+    "wasmtime:config",
+    "This is a message for you"
+  );
 
-  const comment = makeMessage(userToLabel, providedLabels, configPath);
-
-  const labels = getCommentLabels(comment);
-  assert.deepEqual(labels, ["fuzzing", "cranelift"].sort());
-});
-
-test("test getCommentLabels with single label", () => {
-  let userToLabel = new Map();
-  userToLabel.set("fitzgen", ["fuzzing"]);
-  let providedLabels = ["fuzzing"];
-  let configPath = ".github/subscribe-to-label.json";
-
-  const comment = makeMessage(userToLabel, providedLabels, configPath);
-
-  const labels = getCommentLabels(comment);
-  assert.deepEqual(labels, ["fuzzing"]);
+  const label = getCommentLabel(comment);
+  assert.equal(label, "wasmtime:config");
 });

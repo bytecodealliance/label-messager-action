@@ -1,113 +1,82 @@
 const core = require("@actions/core");
 const github = require("@actions/github");
+const path = require("path");
 
 async function main() {
   try {
     const repoToken = core.getInput("repo-token");
     const client = new github.GitHub(repoToken);
-
-    const configPath = core.getInput("configuration-path");
-    console.log("Reading subscription configuration from:", configPath);
-    const config = JSON.parse(await fetchContent(client, configPath));
+    const messageDir = core.getInput("message-directory");
 
     if (github.context.payload.issue) {
       const issueNumber = github.context.payload.issue.number;
       const labels = [github.context.payload.label.name];
-      await processIssue(client, config, configPath, issueNumber, labels);
+      await processIssue(client, messageDir, issueNumber, labels);
     } else {
-      await triagePullRequests(client, config, configPath);
+      await triagePullRequests(client, messageDir);
     }
   } catch (error) {
     console.error(
-      `Subscribe to label error: ${error.message}\n\nStack:\b${error.stack}`
+      `Label Messager error: ${error.message}\n\nStack:\b${error.stack}`
     );
     core.setFailed(
-      `Subscribe to label error: ${error.message}\n\nStack:\b${error.stack}`
+      `Label Messager error: ${error.message}\n\nStack:\b${error.stack}`
     );
   }
 }
 exports.main = main;
 
-function makeMessage(userToLabel, labels, configPath) {
+function makeMessage(messageDir, messagePath, label, message) {
   // XXX: if you change the format of this message, make sure that we still
-  // match it correctly in `triagePullRequests` and in `getCommentLabels`!!1!
-  let allUsers = Array.from(userToLabel.keys())
-    .map((user) => "@" + user)
-    .sort()
-    .join(", ");
-  let reasons = Array.from(userToLabel.entries())
-    .map(([user, userLabels]) => `* ${user}: ${userLabels.sort().join(", ")}`)
-    .sort()
-    .join("\n");
-
+  // match it correctly in `triagePullRequests` and in `getCommentLabel`!!1!
   return `
-#### Subscribe to Label Action
+#### Label Messager: ${label}
 
-cc ${allUsers}
+${message}
 
 <details>
-This issue or pull request has been labeled: ${[...labels]
-    .map((l) => '"' + l + '"')
-    .sort()
-    .join(", ")}
 
-Thus the following users have been cc'd because of the following labels:
+To modify this label's message, edit the <code>${messagePath}</code> file.  To
+stop leaving these messages for the <code>${label}</code> label completely,
+remove that file.
 
-${reasons}
+To add new label messages, add a file inside the <code>${messageDir}</code>
+directory with the name of the label.
 
-To subscribe or unsubscribe from this label, edit the <code>${configPath}</code> configuration file.
+[Learn more.](https://github.com/bytecodealliance/label-messager-action)
 
-[Learn more.](https://github.com/bytecodealliance/subscribe-to-label-action)
 </details>
 `.trim();
 }
 exports.makeMessage = makeMessage;
 
-async function processIssue(client, config, configPath, issueNumber, labels) {
-  const userToLabel = new Map();
+async function processIssue(client, messageDir, issueNumber, labels) {
   for (const label of labels) {
     console.log(`Processing label "${label}" on #${issueNumber}`);
 
-    const usersToNotify = getUsersToNotifyForLabel(config, label);
-    console.log("Notifying users:", usersToNotify);
-
-    if (usersToNotify.length === 0) {
+    const messagePath = path.join(messageDir, label);
+    let message = null;
+    try {
+      message = await fetchContent(client, messagePath);
+    } catch (e) {
+      console.log(`No message for label "${label}" at "${messagePath}"`);
       continue;
     }
 
-    for (let user of usersToNotify) {
-      if (!userToLabel.has(user)) {
-        userToLabel.set(user, [label]);
-      } else {
-        userToLabel.get(user).push(label);
-      }
-    }
+    const messageText = makeMessage(messageDir, messagePath, label, message);
+
+    console.log(`Creating comment:\n\n"""\n${message}\n"""`);
+
+    await client.issues.createComment({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: issueNumber,
+      body: messageText,
+    });
   }
-
-  if (userToLabel.size === 0) {
-    return;
-  }
-
-  const message = makeMessage(userToLabel, labels, configPath);
-
-  console.log(`Creating comment:\n\n"""\n${message}\n"""`);
-
-  await client.issues.createComment({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    issue_number: issueNumber,
-    body: message,
-  });
 }
 
-function getUsersToNotifyForLabel(config, label) {
-  return Object.entries(config)
-    .filter(([_, labels]) => labels.indexOf(label) >= 0)
-    .map(([user, _]) => user);
-}
-exports.getUsersToNotifyForLabel = getUsersToNotifyForLabel;
-
-async function triagePullRequests(client, config, configPath) {
+async function triagePullRequests(client, messageDir) {
   const operationsPerRun = parseInt(
     core.getInput("operations-per-run", { required: true })
   );
@@ -162,40 +131,33 @@ async function triagePullRequests(client, config, configPath) {
           // lots of bot spam.
           if (
             comment.user.login !== "github-actions[bot]" ||
-            !comment.body.startsWith("#### Subscribe to Label Action")
+            !comment.body.startsWith("#### Label Messager")
           ) {
             continue;
           }
 
-          for (const l of getCommentLabels(comment.body)) {
-            console.log(`Already left a subscription comment for label "${l}"`);
-            labelsToComment.delete(l);
-          }
+          const alreadyCommented = getCommentLabel(comment.body);
+          console.log(`Already left a subscription comment for label "${alreadyCommented}"`);
+          labelsToComment.delete(alreadyCommented);
         }
       }
 
       if (labelsToComment.size > 0) {
         operationsLeft -= 1;
-        processIssue(client, config, configPath, pr.number, labelsToComment);
+        processIssue(client, messageDir, pr.number, labelsToComment);
       }
     }
   }
 }
 
-function getCommentLabels(comment) {
-  // Get the comment string after "labeled: ".
-  const startOfLabels = comment.slice(
-    comment.indexOf("labeled: ") + "labeled: ".length
-  );
+function getCommentLabel(comment) {
+  // Get the comment string after "Label Messager: ".
+  const startOfLabel = comment.slice(comment.indexOf("Label Messager: ") + "Label Messager: ".length);
 
-  // Get just the labels joined by ", " and with their quotes.
-  const joinedLabels = startOfLabels.slice(0, startOfLabels.indexOf("\n"));
-
-  // Split the labels, remove the quotes, and remove the corresponding
-  // entry from `labelsToComment`.
-  return joinedLabels.split(", ").map((l) => l.substring(1, l.length - 1));
+  // The label is up until the newline.
+  return startOfLabel.slice(0, startOfLabel.indexOf("\n"));
 }
-exports.getCommentLabels = getCommentLabels;
+exports.getCommentLabel = getCommentLabel;
 
 async function fetchContent(client, path) {
   const response = await client.repos.getContents({
@@ -204,6 +166,13 @@ async function fetchContent(client, path) {
     ref: github.context.sha,
     path,
   });
+  console.log("Got response:", response);
+
+  if (response.status != 200) {
+    const msg = `Failed to fetch content: ${path}`;
+    console.log(msg);
+    throw new Error(msg);
+  }
 
   return Buffer.from(response.data.content, response.data.encoding).toString();
 }

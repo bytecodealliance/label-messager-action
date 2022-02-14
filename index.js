@@ -1,3 +1,3 @@
-const { main } = require("./subscribe-to-label");
+const { main } = require("./label-messager");
 
 main();
