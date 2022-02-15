@@ -4,9 +4,9 @@ inputs:
   repo-token:
     description: "GITHUB_TOKEN secret"
     required: true
-  message-directory:
-    description: "The directory path containing all of the messages"
-    default: ".github/label-messager"
+  configuration-path:
+    description: "The path of the configuration file"
+    default: ".github/label-messager.json"
   operations-per-run:
     description: "The rough number of github API calls to do per background run. This is to avoid running up against rate limits."
     default: 50

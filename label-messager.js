@@ -1,19 +1,19 @@
 const core = require("@actions/core");
 const github = require("@actions/github");
-const path = require("path");
 
 async function main() {
   try {
     const repoToken = core.getInput("repo-token");
     const client = new github.GitHub(repoToken);
-    const messageDir = core.getInput("message-directory");
+    const configPath = core.getInput("configuration-path");
+    const config = JSON.parse(fetchContent(client, configPath));
 
     if (github.context.payload.issue) {
       const issueNumber = github.context.payload.issue.number;
       const labels = [github.context.payload.label.name];
-      await processIssue(client, messageDir, issueNumber, labels);
+      await processIssue(client, config, configPath, issueNumber, labels);
     } else {
-      await triagePullRequests(client, messageDir);
+      await triagePullRequests(client, config, configPath);
     }
   } catch (error) {
     console.error(
@@ -26,7 +26,7 @@ async function main() {
 }
 exports.main = main;
 
-function makeMessage(messageDir, messagePath, label, message) {
+function makeMessage(configPath, messagePath, label, message) {
   // XXX: if you change the format of this message, make sure that we still
   // match it correctly in `triagePullRequests` and in `getCommentLabel`!!1!
   return `
@@ -38,12 +38,10 @@ ${message}
 
 <details>
 
-To modify this label's message, edit the <code>${messagePath}</code> file.  To
-stop leaving these messages for the <code>${label}</code> label completely,
-remove that file.
+To modify this label's message, edit the <code>${messagePath}</code> file.
 
-To add new label messages, add a file inside the <code>${messageDir}</code>
-directory with the name of the label.
+To add new label messages or remove existing label messages, edit the
+<code>${configPath}</code> configuration file.
 
 [Learn more.](https://github.com/bytecodealliance/label-messager-action)
 
@@ -52,23 +50,26 @@ directory with the name of the label.
 }
 exports.makeMessage = makeMessage;
 
-async function processIssue(client, messageDir, issueNumber, labels) {
+async function processIssue(client, config, configPath, issueNumber, labels) {
   for (const label of labels) {
-    console.log(`Processing label "${label}" on #${issueNumber}`);
+    log(`Processing label "${label}" on #${issueNumber}`);
 
-    const messagePath = path.join(messageDir, label);
+    const messagePath = config[label];
+    if (!messagePath) {
+      log(`No message configured for label "${label}"`);
+      continue;
+    }
+
     let message = null;
     try {
       message = await fetchContent(client, messagePath);
     } catch (e) {
-      console.log(`No message for label "${label}" at "${messagePath}"`);
+      warn(`Failed to fetch message for label "${label}" at "${messagePath}"`);
       continue;
     }
 
-    const messageText = makeMessage(messageDir, messagePath, label, message);
-
-    console.log(`Creating comment:\n\n"""\n${message}\n"""`);
-
+    const messageText = makeMessage(configPath, messagePath, label, message);
+    log(`Creating comment:\n\n"""\n${messageText}\n"""`);
     await client.issues.createComment({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
@@ -78,7 +79,7 @@ async function processIssue(client, messageDir, issueNumber, labels) {
   }
 }
 
-async function triagePullRequests(client, messageDir) {
+async function triagePullRequests(client, config, configPath) {
   const operationsPerRun = parseInt(
     core.getInput("operations-per-run", { required: true })
   );
@@ -146,7 +147,7 @@ async function triagePullRequests(client, messageDir) {
 
       if (labelsToComment.size > 0) {
         operationsLeft -= 1;
-        processIssue(client, messageDir, pr.number, labelsToComment);
+        processIssue(client, config, configPath, pr.number, labelsToComment);
       }
     }
   }
@@ -182,4 +183,9 @@ async function fetchContent(client, path) {
 function warn(msg) {
   console.warn(msg);
   core.warning(msg);
+}
+
+function log(msg) {
+  console.log(msg);
+  core.debug(msg);
 }
