@@ -34,6 +34,8 @@ function makeMessage(messageDir, messagePath, label, message) {
 
 ${message}
 
+--------------------------------------------------------------------------------
+
 <details>
 
 To modify this label's message, edit the <code>${messagePath}</code> file.  To

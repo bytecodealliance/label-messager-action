@@ -11,6 +11,8 @@ test("test makeMessage", () => {
 
 This is a message for you
 
+--------------------------------------------------------------------------------
+
 <details>
 
 To modify this label's message, edit the <code>.github/label-messager/wasmtime:config</code> file.  To
