@@ -15,12 +15,10 @@ This is a message for you
 
 <details>
 
-To modify this label's message, edit the <code>.github/label-messager/wasmtime:config</code> file.  To
-stop leaving these messages for the <code>wasmtime:config</code> label completely,
-remove that file.
+To modify this label's message, edit the <code>.github/label-messager/wasmtime-config.md</code> file.
 
-To add new label messages, add a file inside the <code>.github/label-messager</code>
-directory with the name of the label.
+To add new label messages or remove existing label messages, edit the
+<code>.github/label-messager.json</code> configuration file.
 
 [Learn more.](https://github.com/bytecodealliance/label-messager-action)
 
@@ -28,8 +26,8 @@ directory with the name of the label.
 `.trim();
 
   const observed = makeMessage(
-    ".github/label-messager",
-    ".github/label-messager/wasmtime:config",
+    ".github/label-messager.json",
+    ".github/label-messager/wasmtime-config.md",
     "wasmtime:config",
     "This is a message for you"
   );

@@ -27,8 +27,14 @@ jobs:
 ```
 
 Then configure what messages to add when issues or pull requests are labeled
-with which label by adding files in the `.github/label-messager` directory. The
-message for label `MY_LABEL` is the file `.github/label-messager/MY_LABEL`.
+with which label by adding entries to the `.github/label-messager.json`
+configuration file:
+
+```json
+{
+  "my-label": "path/to/message.md"
+}
+```
 
 ## Contributing
 
