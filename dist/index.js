@@ -1551,7 +1551,7 @@ async function main() {
     const repoToken = core.getInput("repo-token");
     const client = new github.GitHub(repoToken);
     const configPath = core.getInput("configuration-path");
-    const config = JSON.parse(fetchContent(client, configPath));
+    const config = JSON.parse(await fetchContent(client, configPath));
 
     if (github.context.payload.issue) {
       const issueNumber = github.context.payload.issue.number;
